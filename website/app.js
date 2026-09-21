@@ -556,6 +556,69 @@ function createCourseCardHTML(note) {
     `;
 }
 
+// Global helper to render Markdown while preserving LaTeX math formulas ($$...$$ and $...$)
+// and SVG/HTML blocks from marked.js character mangling (such as collapsing \\, _, *, &)
+function renderMarkdownWithHTML(text) {
+    if (!text) return "";
+
+    const codePlaceholders = [];
+    let codeId = 0;
+    // 1. Preserve fenced code blocks
+    let protectedText = text.replace(/```[\s\S]*?```/g, (match) => {
+        const token = `KATEXCODEFENCE${codeId++}XYZ`;
+        codePlaceholders.push({ token, content: match, isBlock: true });
+        return token;
+    });
+    // 2. Preserve inline code blocks
+    protectedText = protectedText.replace(/`[^`\n]+?`/g, (match) => {
+        const token = `KATEXCODEINL${codeId++}XYZ`;
+        codePlaceholders.push({ token, content: match, isBlock: false });
+        return token;
+    });
+
+    // 3. Preserve display math: $$ ... $$
+    const mathPlaceholders = [];
+    let mathId = 0;
+    protectedText = protectedText.replace(/\$\$([\s\S]*?)\$\$/g, (match) => {
+        const token = `KATEXMATHDISP${mathId++}XYZ`;
+        mathPlaceholders.push({ token, content: match });
+        return token;
+    });
+
+    // 4. Preserve inline math: $ ... $ (excluding escaped \$ and line breaks)
+    protectedText = protectedText.replace(/(^|[^\\])\$([^\$\n]+?)\$/g, (match, prefix, mathContent) => {
+        const token = `KATEXMATHINL${mathId++}XYZ`;
+        mathPlaceholders.push({ token, content: `$${mathContent}$` });
+        return prefix + token;
+    });
+
+    // 5. Preserve SVGs
+    protectedText = protectedText.replace(/(<svg[\s\S]*?<\/svg>)/gi, (match) => {
+        return match.split('\n').map(line => line.trim()).join('\n');
+    });
+
+    // 6. Run marked.parse
+    let html = marked.parse(protectedText);
+
+    // 7. Restore math tokens safely using a function replacer (avoids JavaScript String.replace '$$' trap)
+    for (const item of mathPlaceholders) {
+        // Normalize any quadruple backslashes (\\\\) to standard LaTeX row breaks (\\)
+        const normalized = item.content.replace(/\\\\\\\\/g, '\\\\');
+        html = html.replace(item.token, () => normalized);
+    }
+
+    // 8. Restore code tokens safely
+    for (const item of codePlaceholders) {
+        if (item.isBlock) {
+            html = html.replace(item.token, () => marked.parse(item.content));
+        } else {
+            html = html.replace(item.token, () => `<code>${item.content.slice(1, -1)}</code>`);
+        }
+    }
+
+    return html;
+}
+
 let activeModalNoteId = null;
 
 function openCourseModal(note) {
@@ -608,15 +671,6 @@ function openCourseModal(note) {
         year: "numeric"
     });
     document.getElementById("modal-date").innerHTML = `<i data-lucide="calendar"></i> ${dateStr}`;
-
-    // Helper to render Markdown while preserving SVG/HTML blocks without code-block escaping
-    function renderMarkdownWithHTML(text) {
-        if (!text) return "";
-        const cleaned = text.replace(/(<svg[\s\S]*?<\/svg>)/gi, (match) => {
-            return match.split('\n').map(line => line.trim()).join('\n');
-        });
-        return marked.parse(cleaned);
-    }
 
     // Render Tab 1: AI Summary
     const summaryContainer = document.getElementById("summary-content");
@@ -925,6 +979,38 @@ const CANONICAL_FORMULARIES = {
             formula: "X(s) = \\mathcal{L}\\{x(t)\\} = \\int_{0}^{+\\infty} x(t) e^{-s t} dt",
             desc: "Analyse des systèmes différentiels et fonctions de transfert continus."
         }
+    ],
+    optics: [
+        {
+            name: "Loi de Snell-Descartes (Réfraction)",
+            formula: "n_1 \\sin(\\theta_1) = n_2 \\sin(\\theta_2)",
+            desc: "Continuité de la composante tangentielle du vecteur d'onde à l'interface de deux milieux diélectriques."
+        },
+        {
+            name: "Matrice de Transfert Rayon ABCD (Système Centré)",
+            formula: "\\begin{pmatrix} y_2 \\\\ \\alpha_2 \\end{pmatrix} = \\begin{bmatrix} A & B \\\\ C & D \\end{bmatrix} \\begin{pmatrix} y_1 \\\\ \\alpha_1 \\end{pmatrix} \\quad \\text{avec } \\det(M) = 1",
+            desc: "Formalisme matriciel 2x2 des rayons paraxiaux. Vecteur d'état (hauteur y, angle alpha) transformé par une matrice carrée unimodulaire."
+        },
+        {
+            name: "Matrice de Réfraction (Dioptre Sphérique)",
+            formula: "\\Pi_1 = \\begin{bmatrix} 1 & 0 \\\\ -\\frac{n_2 - n_1}{n_2 R} & \\frac{n_1}{n_2} \\end{bmatrix}",
+            desc: "Matrice carrée 2x2 modélisant le passage à travers un dioptre sphérique de rayon de courbure R séparant deux indices n1 et n2."
+        },
+        {
+            name: "Matrice de Translation Axiale",
+            formula: "\\Pi_T = \\begin{bmatrix} 1 & d \\\\ 0 & 1 \\end{bmatrix}",
+            desc: "Matrice carrée 2x2 représentant la propagation libre en ligne droite dans un milieu homogène d'épaisseur d."
+        },
+        {
+            name: "Plans Principaux & Foyers (Lentille Épaisse)",
+            formula: "f_B = -\\frac{D}{C}, \\quad f_F = -\\frac{A}{C}, \\quad h_2 = -\\frac{A - 1}{C}, \\quad h_1 = \\frac{D - 1}{C}",
+            desc: "Distances focales et positions des plans principaux H1 et H2 calculées à partir des éléments de la matrice globale M = [[A, B], [C, D]]."
+        },
+        {
+            name: "Condition de Conjugaison Image (Stigmatisme)",
+            formula: "B' = 0 \\quad \\iff \\quad x_2 = -\\frac{A x_1 + B}{C x_1 + D}",
+            desc: "Condition pour que tous les rayons issus du point objet x1 convergent vers un unique point image x2 (stigmatisme rigoureux)."
+        }
     ]
 };
 
@@ -937,7 +1023,9 @@ function renderFormulasTab(note) {
     
     // Select canonical cheatsheet category
     let categoryKey = "generalMath";
-    if (subjectText.includes("signal") || subjectText.includes("sic") || subjectText.includes("traitement") || subjectText.includes("fourier")) {
+    if (subjectText.includes("opti") || subjectText.includes("lumière") || subjectText.includes("lens") || subjectText.includes("dioptre") || subjectText.includes("geometrical") || subjectText.includes("ray")) {
+        categoryKey = "optics";
+    } else if (subjectText.includes("signal") || subjectText.includes("sic") || subjectText.includes("traitement") || subjectText.includes("fourier")) {
         categoryKey = "signal";
     } else if (subjectText.includes("réseau") || subjectText.includes("net") || subjectText.includes("shannon") || subjectText.includes("commutation")) {
         categoryKey = "networks";
@@ -1259,7 +1347,7 @@ async function saveCorrection() {
         // Re-render Tab 2: Transcription & KaTeX
         const transcriptionContainer = document.getElementById("transcription-content");
         if (transcriptionContainer) {
-            transcriptionContainer.innerHTML = marked.parse(newTranscription);
+            transcriptionContainer.innerHTML = renderMarkdownWithHTML(newTranscription);
             renderKaTeX(transcriptionContainer);
         }
 
