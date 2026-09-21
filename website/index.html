@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="fr" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mes Cours & Retranscriptions - GoodNotes Pipeline</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- KaTeX CSS for LaTeX math rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    
+    <!-- Custom Design CSS -->
+    <link rel="stylesheet" href="styles.css?v=4">
+
+    <!-- Libraries (Supabase, Marked, KaTeX, Lucide Icons) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+    <div class="app-layout">
+        
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="brand">
+                    <div class="brand-icon">
+                        <i data-lucide="book-open"></i>
+                    </div>
+                    <div class="brand-text">
+                        <h2>Mes Cours</h2>
+                        <span class="brand-subtitle">GoodNotes & Gemini OCR</span>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav" id="sidebar-nav">
+                <!-- Dynamic 3-level accordion tree (École -> Année -> Matière) injected by app.js -->
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-profile">
+                    <div class="profile-avatar">JA</div>
+                    <div class="profile-info">
+                        <span class="profile-name">Jacques Angleys</span>
+                        <span class="profile-status">Pipeline Active</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            
+            <!-- Top Navbar / Header -->
+            <header class="topbar">
+                <button class="mobile-toggle" id="mobile-sidebar-toggle">
+                    <i data-lucide="menu"></i>
+                </button>
+
+                <div class="search-box">
+                    <i data-lucide="search" class="search-icon"></i>
+                    <input type="text" id="search-input" placeholder="Rechercher un cours, une notion, une formule... [/]" autocomplete="off">
+                </div>
+
+                <div class="topbar-actions" style="display: flex; align-items: center; gap: 12px;">
+                    <button class="action-btn-primary" id="trigger-scan-btn" onclick="triggerWebScan();" title="Lancer un scan rapide des nouveaux fichiers Google Drive" style="padding: 8px 16px; font-size: 0.88rem; background: var(--accent-blue); color: #ffffff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25); transition: all 0.2s;">
+                        <i data-lucide="refresh-cw" id="scan-btn-icon" style="width: 16px; height: 16px;"></i>
+                        <span id="scan-btn-text">Resynchroniser Drive</span>
+                    </button>
+                    <button class="action-btn-secondary" id="trigger-reanalyze-all-btn" onclick="triggerReanalyzeAll();" title="Forcer une nouvelle analyse Gemini IA sur TOUS les documents d'origine" style="padding: 8px 16px; font-size: 0.88rem; background: rgba(147, 51, 234, 0.12); color: #9333ea; border: 1px solid rgba(147, 51, 234, 0.3); border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s;">
+                        <i data-lucide="sparkles" id="reanalyze-all-btn-icon" style="width: 16px; height: 16px;"></i>
+                        <span id="reanalyze-all-btn-text">Ré-analyser tout par IA</span>
+                    </button>
+                    <button class="theme-toggle" id="theme-toggle-btn" title="Basculer le thème">
+                        <i data-lucide="moon" id="theme-icon"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Dashboard Body -->
+            <div class="dashboard-body">
+                
+                <div class="dashboard-header">
+                    <div>
+                        <h1 class="page-title" id="active-subject-title">Tous les cours</h1>
+                        <p class="page-subtitle">Retranscriptions intégrales & résumés générés par IA</p>
+                    </div>
+                    <div class="stats-badge" id="notes-total-badge">
+                        <i data-lucide="file-text"></i> <span id="notes-total-count">0</span> cours enregistrés
+                    </div>
+                </div>
+
+                <!-- Empty State -->
+                <div class="empty-state hidden" id="empty-state">
+                    <div class="empty-icon">
+                        <i data-lucide="file-search"></i>
+                    </div>
+                    <h3>Aucun cours trouvé</h3>
+                    <p>Aucun cours ne correspond à vos critères de recherche ou aucune note n'a encore été synchronisée.</p>
+                </div>
+
+                <!-- Course Cards Grid -->
+                <div class="courses-grid" id="courses-grid">
+                    <!-- Cards injected dynamically via app.js -->
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Course Viewer Overlay Modal -->
+    <div class="modal-backdrop hidden" id="course-modal">
+        <div class="modal-container">
+            
+            <!-- Modal Header -->
+            <div class="modal-header" style="padding: 22px 28px; border-bottom: 1px solid var(--border-color); background: var(--bg-card);">
+                <div class="modal-title-group">
+                    <div class="subject-tag-wrapper" style="display: flex; align-items: center; gap: 8px;">
+                        <span class="subject-tag" id="modal-subject-tag" title="Cliquer pour reclasser la matière" onclick="window.onEditSubject();" style="cursor: pointer; padding: 4px 12px; font-weight: 600; font-size: 0.8rem; background: rgba(59, 130, 246, 0.12); color: #2563eb; border-radius: 20px; border: 1px solid rgba(59, 130, 246, 0.25); display: inline-flex; align-items: center; gap: 6px;">
+                            <span id="modal-subject-tag-text">Matière</span>
+                            <i data-lucide="edit-3" style="width: 12px; height: 12px;"></i>
+                        </span>
+                    </div>
+                    <h2 class="modal-course-title" id="modal-title" style="margin-top: 8px; font-size: 1.45rem; font-weight: 700; color: var(--text-primary);">Titre du cours</h2>
+                    <span class="modal-course-date" id="modal-date" style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; display: inline-flex; align-items: center; gap: 6px;"><i data-lucide="calendar" style="width: 14px; height: 14px;"></i> Date</span>
+                </div>
+                
+                <div class="modal-controls" style="display: flex; gap: 10px; align-items: flex-start;">
+                    <button class="icon-btn" id="modal-reanalyze-btn" title="Refaire une analyse IA par Gemini sur le document d'origine" onclick="window.onReanalyzeCurrentNote();" style="background: rgba(147, 51, 234, 0.1); color: #9333ea; border: 1px solid rgba(147, 51, 234, 0.25); padding: 7px 14px; border-radius: 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+                        <i data-lucide="sparkles" id="modal-reanalyze-icon" style="width: 16px; height: 16px;"></i> <span style="font-size: 0.85rem;" id="modal-reanalyze-text">Ré-analyser par IA</span>
+                    </button>
+                    <button class="icon-btn" id="modal-move-btn" title="Déplacer / Classer cette fiche" onclick="window.onMoveCurrentNote();" style="background: rgba(59, 130, 246, 0.1); color: #2563eb; border: 1px solid rgba(59, 130, 246, 0.25); padding: 7px 14px; border-radius: 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+                        <i data-lucide="folder-output" style="width: 16px; height: 16px;"></i> <span style="font-size: 0.85rem;">Déplacer</span>
+                    </button>
+                    <button class="icon-btn danger-btn" id="modal-delete-btn" title="Supprimer cette fiche" onclick="window.onDeleteCurrentNote();" style="padding: 7px; border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.2); color: #ef4444; background: rgba(239, 68, 68, 0.08); cursor: pointer;">
+                        <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+                    </button>
+                    <button class="icon-btn" id="modal-close-btn" title="Fermer (Échap)" onclick="closeModal();" style="padding: 7px; border-radius: 8px; border: 1px solid var(--border-color); background: transparent; color: var(--text-primary); cursor: pointer;">
+                        <i data-lucide="x" style="width: 18px; height: 18px;"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Tab Switcher -->
+            <div class="modal-tabs" style="padding: 0 28px; background: var(--bg-card); border-bottom: 1px solid var(--border-color);">
+                <button class="tab-btn active" data-tab="summary">
+                    <i data-lucide="sparkles"></i> Résumé (IA)
+                </button>
+                <button class="tab-btn" data-tab="transcription">
+                    <i data-lucide="align-left"></i> Retranscription & LaTeX
+                </button>
+                <button class="tab-btn" data-tab="formulas">
+                    <i data-lucide="sigma"></i> Formulaire
+                </button>
+                <button class="tab-btn hidden" id="tab-btn-quiz" data-tab="quiz">
+                    <i data-lucide="check-square"></i> QCM d'Évaluation (3A / BME)
+                </button>
+            </div>
+
+            <!-- Modal Body Content -->
+            <div class="modal-body" style="padding: 24px 28px;">
+                
+                <!-- Tab 1: AI Summary -->
+                <div class="tab-content active" id="tab-summary">
+                    <div class="markdown-body" id="summary-content">
+                        <!-- AI Executive Summary injected here -->
+                    </div>
+                </div>
+
+                <!-- Tab 2: Full Transcription & LaTeX -->
+                <div class="tab-content hidden" id="tab-transcription">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 12px 18px; background: linear-gradient(135deg, rgba(37, 99, 235, 0.08) 0%, rgba(124, 58, 237, 0.08) 100%); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 12px;">
+                        <span style="font-size: 0.9rem; color: var(--text-primary); font-weight: 500; display: flex; align-items: center; gap: 8px;">
+                            <i data-lucide="sparkles" style="width: 18px; height: 18px; color: #2563eb;"></i>
+                            <span>Retranscription exacte du cours manuscrit avec <strong>schémas vectoriels SVG</strong>, équations KaTeX et encarts de correction.</span>
+                        </span>
+                        <button class="action-btn-primary" id="open-correction-btn" onclick="openCorrectionEditor();" style="padding: 8px 16px; font-size: 0.88rem; background: #2563eb; color: #ffffff; border: none; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: 600; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25); transition: all 0.2s;">
+                            <i data-lucide="edit-3" style="width: 16px; height: 16px;"></i> Éditer / Signaler une erreur
+                        </button>
+                    </div>
+                    <div class="markdown-body" id="transcription-content">
+                        <!-- Markdown & KaTeX content injected here -->
+                    </div>
+                </div>
+
+                <!-- Tab 3: Formulaire par Matière / Course Formulas -->
+                <div class="tab-content hidden" id="tab-formulas">
+                    <div class="markdown-body" id="formulas-content">
+                        <!-- Formulaire injected here -->
+                    </div>
+                </div>
+
+                <!-- Tab 4: QCM Quiz (Restricted to 3A & Master BME) -->
+                <div class="tab-content hidden" id="tab-quiz">
+                    <div id="quiz-content" style="padding: 10px 0;">
+                        <!-- Interactive QCM injected here -->
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Move / Reclassify Note Modal -->
+    <div class="modal-backdrop hidden" id="move-note-modal" style="z-index: 2000;">
+        <div class="modal-container" style="max-width: 480px; height: auto; max-height: 90vh;">
+            <div class="modal-header" style="padding: 18px 24px;">
+                <div class="modal-title-group">
+                    <h2 class="modal-course-title" style="font-size: 1.2rem;">Déplacer / Classer cette fiche</h2>
+                    <span class="modal-course-date" id="move-modal-subtitle" style="font-size: 0.85rem; color: var(--text-muted);">Choisir la nouvelle destination dans l'arborescence</span>
+                </div>
+                <button class="icon-btn" onclick="closeMoveModal();">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-weight: 600; font-size: 0.85rem; color: var(--text-primary);">École / Établissement :</label>
+                    <select id="move-school-select" style="padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-modal); color: var(--text-primary); font-size: 0.95rem;">
+                        <option value="TSP">TSP (Télécom SudParis)</option>
+                        <option value="Master BME">Master BME</option>
+                        <option value="__NEW__">+ Autre école...</option>
+                    </select>
+                    <input type="text" id="move-school-custom" class="hidden" placeholder="Nom de l'école..." style="margin-top: 6px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-modal); color: var(--text-primary); font-size: 0.95rem;">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-weight: 600; font-size: 0.85rem; color: var(--text-primary);">Année / Cursus :</label>
+                    <select id="move-year-select" style="padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-modal); color: var(--text-primary); font-size: 0.95rem;">
+                        <option value="1A">1A (1ère Année)</option>
+                        <option value="2A">2A (2ème Année)</option>
+                        <option value="3A">3A (3ème Année / VAP)</option>
+                        <option value="Tronc Commun (1A/2A)">Tronc Commun (1A/2A)</option>
+                        <option value="Master 1">Master 1</option>
+                        <option value="Master 2">Master 2</option>
+                        <option value="__NEW__">+ Autre année...</option>
+                    </select>
+                    <input type="text" id="move-year-custom" class="hidden" placeholder="Ex: 1A, 2A, Master 1..." style="margin-top: 6px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-modal); color: var(--text-primary); font-size: 0.95rem;">
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-weight: 600; font-size: 0.85rem; color: var(--text-primary);">Matière / Code UE (ex: CSC 3101, SH - Langues) :</label>
+                    <input type="text" id="move-subject-input" placeholder="Ex: CSC3101, PHY4101, SH - Langues..." style="padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-modal); color: var(--text-primary); font-size: 0.95rem;">
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+                    <button type="button" class="btn-secondary" onclick="closeMoveModal();" style="padding: 8px 16px; border-radius: 8px; cursor: pointer; border: 1px solid var(--border-color); background: transparent; color: var(--text-primary);">Annuler</button>
+                    <button type="button" id="save-move-note-btn" style="padding: 8px 18px; border-radius: 8px; background: #2563eb; color: #ffffff; font-weight: 600; cursor: pointer; border: none;">Enregistrer & Déplacer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Interactive Correction / Feedback Modal -->
+    <div class="modal-backdrop hidden" id="correction-editor-modal" style="z-index: 2500;">
+        <div class="modal-container" style="max-width: 720px; height: auto; max-height: 92vh;">
+            <div class="modal-header" style="padding: 18px 24px; border-bottom: 1px solid var(--border-color);">
+                <div class="modal-title-group">
+                    <h2 class="modal-course-title" style="font-size: 1.25rem; display: flex; align-items: center; gap: 8px;">
+                        <i data-lucide="edit-3" style="color: var(--accent-blue);"></i> Édition & Correctif Pédagogique
+                    </h2>
+                    <span class="modal-course-date" id="correction-subtitle" style="font-size: 0.85rem; color: var(--text-muted);">Signaler une coquille ou modifier le Markdown de la retranscription</span>
+                </div>
+                <button class="icon-btn" onclick="closeCorrectionModal();" title="Fermer">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+                <div style="padding: 12px 16px; background: rgba(245, 158, 11, 0.08); border-left: 4px solid #f59e0b; border-radius: 8px; font-size: 0.88rem; color: var(--text-secondary);">
+                    <strong>💡 Conseil pédagogique :</strong> Vous pouvez corriger directement le texte Markdown ci-dessous (équations LaTeX, schémas, définitions). Toute coquille manuscrite originale peut être signalée en utilisant la balise <code>&lt;div class="note-correction"&gt;...&lt;/div&gt;</code> pour faire apparaître un encart d'avertissement.
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <label style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary); display: flex; justify-content: space-between;">
+                        <span>Contenu Markdown de la Retranscription :</span>
+                        <span style="font-size: 0.8rem; color: var(--text-muted);">Supporte KaTeX ($...$ et $$...$$)</span>
+                    </label>
+                    <textarea id="correction-textarea" style="width: 100%; height: 300px; padding: 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--bg-main); color: var(--text-primary); font-family: var(--font-mono); font-size: 0.9rem; line-height: 1.6; resize: vertical; outline: none;"></textarea>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                    <span id="correction-status-msg" style="font-size: 0.85rem; font-weight: 500; color: #10b981;"></span>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" class="btn-secondary" onclick="closeCorrectionModal();" style="padding: 9px 18px; border-radius: 8px; cursor: pointer; border: 1px solid var(--border-color); background: transparent; color: var(--text-primary);">Annuler</button>
+                        <button type="button" id="save-correction-btn" onclick="saveCorrection();" style="padding: 9px 20px; border-radius: 8px; background: #2563eb; color: #ffffff; font-weight: 600; cursor: pointer; border: none; display: flex; align-items: center; gap: 6px;">
+                            <i data-lucide="save" style="width: 16px; height: 16px;"></i> Enregistrer dans Supabase
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- App JavaScript -->
+    <script src="config.js?v=40"></script>
+    <script src="app.js?v=40"></script>
+</body>
+</html>

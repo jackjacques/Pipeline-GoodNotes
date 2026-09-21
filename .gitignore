@@ -1,0 +1,20 @@
+# Environment & Credentials
+.env
+backend/credentials.json
+
+# Logs & Temporary files
+*.log
+pipeline_daemon.log
+backend_daemon.log
+bulk_process.log
+output.txt
+tmp_pdf/
+
+# Python cache & build
+__pycache__/
+*.pyc
+backend/__pycache__/
+
+# OS & IDE metadata
+.DS_Store
+.antigravitycli/
