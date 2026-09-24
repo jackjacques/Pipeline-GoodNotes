@@ -71,14 +71,6 @@
                 </div>
 
                 <div class="topbar-actions" style="display: flex; align-items: center; gap: 12px;">
-                    <button class="action-btn-primary" id="trigger-scan-btn" onclick="triggerWebScan();" title="Lancer un scan rapide des nouveaux fichiers Google Drive" style="padding: 8px 16px; font-size: 0.88rem; background: var(--accent-blue); color: #ffffff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25); transition: all 0.2s;">
-                        <i data-lucide="refresh-cw" id="scan-btn-icon" style="width: 16px; height: 16px;"></i>
-                        <span id="scan-btn-text">Resynchroniser Drive</span>
-                    </button>
-                    <button class="action-btn-secondary" id="trigger-reanalyze-all-btn" onclick="triggerReanalyzeAll();" title="Forcer une nouvelle analyse Gemini IA sur TOUS les documents d'origine" style="padding: 8px 16px; font-size: 0.88rem; background: rgba(147, 51, 234, 0.12); color: #9333ea; border: 1px solid rgba(147, 51, 234, 0.3); border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s;">
-                        <i data-lucide="sparkles" id="reanalyze-all-btn-icon" style="width: 16px; height: 16px;"></i>
-                        <span id="reanalyze-all-btn-text">Ré-analyser tout par IA</span>
-                    </button>
                     <button class="theme-toggle" id="theme-toggle-btn" title="Basculer le thème">
                         <i data-lucide="moon" id="theme-icon"></i>
                     </button>
@@ -134,9 +126,6 @@
                 </div>
                 
                 <div class="modal-controls" style="display: flex; gap: 10px; align-items: flex-start;">
-                    <button class="icon-btn" id="modal-reanalyze-btn" title="Refaire une analyse IA par Gemini sur le document d'origine" onclick="window.onReanalyzeCurrentNote();" style="background: rgba(147, 51, 234, 0.1); color: #9333ea; border: 1px solid rgba(147, 51, 234, 0.25); padding: 7px 14px; border-radius: 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
-                        <i data-lucide="sparkles" id="modal-reanalyze-icon" style="width: 16px; height: 16px;"></i> <span style="font-size: 0.85rem;" id="modal-reanalyze-text">Ré-analyser par IA</span>
-                    </button>
                     <button class="icon-btn" id="modal-move-btn" title="Déplacer / Classer cette fiche" onclick="window.onMoveCurrentNote();" style="background: rgba(59, 130, 246, 0.1); color: #2563eb; border: 1px solid rgba(59, 130, 246, 0.25); padding: 7px 14px; border-radius: 8px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
                         <i data-lucide="folder-output" style="width: 16px; height: 16px;"></i> <span style="font-size: 0.85rem;">Déplacer</span>
                     </button>
