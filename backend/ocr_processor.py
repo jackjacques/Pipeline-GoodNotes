@@ -1,4 +1,5 @@
 import os
+import time
 import tempfile
 from typing import List, Dict, Tuple, Optional, Any
 from PIL import Image
@@ -68,30 +69,37 @@ class GeminiOCRProcessor:
             "4. Ne résume pas le contenu à cette étape : fais une transcription exhaustive et claire sans ommettre de détails."
         )
 
-        max_retries = 4
-        for attempt in range(max_retries):
-            try:
-                image = Image.open(image_path)
-                if HAS_NEW_GENAI:
-                    response = self.client.models.generate_content(
-                        model='gemini-3.6-flash',
-                        contents=[image, prompt]
-                    )
-                    return response.text
-                else:
-                    response = self.model.generate_content([image, prompt])
-                    return response.text
-            except Exception as e:
-                err_str = str(e)
-                if ("RESOURCE_EXHAUSTED" in err_str or "429" in err_str) and attempt < max_retries - 1:
-                    wait_time = 4 * (attempt + 1)
-                    print(f"  [Rate Limit] Page {page_number}: Quota 429 atteint. Pause de {wait_time}s (essai {attempt+1}/{max_retries})...")
-                    time.sleep(wait_time)
-                else:
-                    print(f"[OCR Error] Failed to transcribe page {page_number}: {e}")
-                    if "RESOURCE_EXHAUSTED" in err_str or "429" in err_str:
-                        return f"### Page {page_number}\n\n⚠️ *(Quota API Gemini dépassé - Limite de requêtes/min atteinte)*"
-                    return f"### Page {page_number}\n\n*(Erreur lors de la retranscription de la page)*"
+        models_to_try = ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"]
+        max_retries = 3
+
+        for model_name in models_to_try:
+            for attempt in range(max_retries):
+                try:
+                    image = Image.open(image_path)
+                    if HAS_NEW_GENAI:
+                        response = self.client.models.generate_content(
+                            model=model_name,
+                            contents=[image, prompt]
+                        )
+                        if response and response.text:
+                            return response.text
+                    else:
+                        response = self.model.generate_content([image, prompt])
+                        if response and response.text:
+                            return response.text
+                except Exception as e:
+                    err_str = str(e)
+                    is_transient = any(code in err_str for code in ["503", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "429", "500", "INTERNAL"])
+                    if is_transient and attempt < max_retries - 1:
+                        wait_time = 3 * (attempt + 1)
+                        print(f"  [Retry {model_name}] Page {page_number}: temporairement indisponible ({err_str[:60]}...). Attente {wait_time}s (essai {attempt+1}/{max_retries})...")
+                        time.sleep(wait_time)
+                    else:
+                        # Try next fallback model
+                        break
+
+        print(f"[OCR Error] All models failed to transcribe page {page_number}")
+        return f"### Page {page_number}\n\n*(Transcription temporairement indisponible pour cette page)*"
 
     def generate_course_summary(self, full_transcription: str, title: str, subject_name: str) -> str:
         """Generates a structured executive summary of the entire lecture for the recap email & website."""
@@ -111,26 +119,35 @@ Génère un résumé structuré et clair de la séance au format HTML/Markdown c
 
 Sois synthétique, clair et directement exploitable pour une révision rapide par email."""
 
+        models_to_try = ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"]
         max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                if HAS_NEW_GENAI:
-                    response = self.client.models.generate_content(
-                        model='gemini-3.6-flash',
-                        contents=[prompt]
-                    )
-                    return response.text
-                else:
-                    response = self.model.generate_content([prompt])
-                    return response.text
-            except Exception as e:
-                err_str = str(e)
-                if ("RESOURCE_EXHAUSTED" in err_str or "429" in err_str) and attempt < max_retries - 1:
-                    print(f"  [Rate Limit Summary] Pause de 5s...")
-                    time.sleep(5)
-                else:
-                    print(f"[Summary Error] Failed to generate summary: {e}")
-                    return f"Résumé non disponible pour le cours **{title}**."
+
+        for model_name in models_to_try:
+            for attempt in range(max_retries):
+                try:
+                    if HAS_NEW_GENAI:
+                        response = self.client.models.generate_content(
+                            model=model_name,
+                            contents=[prompt]
+                        )
+                        if response and response.text:
+                            return response.text
+                    else:
+                        response = self.model.generate_content([prompt])
+                        if response and response.text:
+                            return response.text
+                except Exception as e:
+                    err_str = str(e)
+                    is_transient = any(code in err_str for code in ["503", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "429", "500", "INTERNAL"])
+                    if is_transient and attempt < max_retries - 1:
+                        wait_time = 3 * (attempt + 1)
+                        print(f"  [Retry {model_name} Summary]: Attente {wait_time}s...")
+                        time.sleep(wait_time)
+                    else:
+                        break
+
+        print(f"[Summary Error] All models failed to generate summary for '{title}'")
+        return f"Résumé non disponible pour le cours **{title}**."
 
     def process_pdf(self, pdf_path: str, title: str, subject_name: str) -> Tuple[List[Dict[str, Any]], str, str, List[str]]:
         """
