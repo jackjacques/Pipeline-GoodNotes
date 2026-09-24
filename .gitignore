@@ -18,3 +18,4 @@ backend/__pycache__/
 # OS & IDE metadata
 .DS_Store
 .antigravitycli/
+tmp_process/

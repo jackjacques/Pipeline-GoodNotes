@@ -1,5 +1,6 @@
 import os
 import io
+import re
 import tempfile
 from typing import List, Dict, Any, Optional
 from google.oauth2 import service_account
@@ -72,8 +73,13 @@ class GoogleDriveSync:
                         item_id = item.get('id')
 
                         if mime_type == 'application/vnd.google-apps.folder':
-                            # Skip excluded folders such as 'Perso'
-                            if item_name in config.EXCLUDED_FOLDERS or item_name.lower() in [f.lower() for f in config.EXCLUDED_FOLDERS]:
+                            # Skip excluded folders such as 'Perso', '1A', '2A'
+                            is_excluded = (
+                                item_name in config.EXCLUDED_FOLDERS 
+                                or item_name.lower() in [f.lower() for f in config.EXCLUDED_FOLDERS]
+                                or bool(re.search(r'\b(1a|2a)\b', item_name.lower()))
+                            )
+                            if is_excluded:
                                 print(f"[GDrive] Skipping excluded folder: '{item_name}'")
                                 continue
 
@@ -105,7 +111,15 @@ class GoogleDriveSync:
                                 elif len(path) == 2:
                                     subject_name = path[1]
 
+                            # Filter: Only process Master BME and 3A-HTI (legacy TSP 1A/2A are ignored)
+                            is_bme = (school_name == "Master BME") or ('bme' in ' '.join(path).lower())
+                            is_3a_hti = (school_name == "TSP" or 'tsp' in ' '.join(path).lower()) and (
+                                year_name == "3A" or 'hti' in subject_name.lower() or 'hti' in ' '.join(path).lower() or 'vap' in ' '.join(path).lower() or '3a' in ' '.join(path).lower()
+                            )
 
+                            if not (is_bme or is_3a_hti):
+                                print(f"[GDrive] Skipping legacy note (non-BME, non-3A): '{item_name}' ({school_name} / {year_name})")
+                                continue
 
                             pdf_files.append({
                                 "id": item_id,
