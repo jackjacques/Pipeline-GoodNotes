@@ -128,7 +128,7 @@ class EmailNotifier:
         # Convert simple markdown linebreaks to basic HTML for email body
         summary_html = summary_markdown.replace("\n", "<br>").replace("**", "<b>").replace("<b>", "<b>", 1)
 
-        html_body = self.render_email_html(title, subject_name, summary_html)
+        html_body = self.render_email_html(title, subject_name, summary_html, website_url=f"https://notes.jacquesangleys.fr")
         subject_line = f"📚 Récap de cours [{subject_name}] - {title}"
 
         if self.provider == "resend" and HAS_RESEND and config.RESEND_API_KEY:
