@@ -1,0 +1,17 @@
+--- DIRECTIVES GLOBALES DE RETRANSCRIPTION ---                           
+- Conserve fidèlement la structure des titres et des listes à puces.     
+- Notation LaTeX : utilise toujours la notation vectorielle standard     
+\vec{...}.                                                                 
+- Conserve les unités physiques au format standard (\text{m/s}, \text{Hz},
+etc.).                                                                     
+- Ne simplifie ni n'omet aucune étape de calcul ou de démonstration      
+mathématique.                                                              
+- Vocabulaire & abréviations : TSP (Télécom SudParis), BME (Biomedical   
+Engineering), IRM/MRI, TEP, FFT.                                                
+- Lorsque c'est écrit manuscritement en vert, avec une sorte d'astérix, 
+c'est qu'il faut expliquer en détaille la slide ou la notion.
+                                                                             
+--- DIRECTIVES POUR LE RÉSUMÉ ---                                        
+- Met bien en avant les théorèmes fondamentaux et formules canoniques.   
+- Ne pas inclure de valeurs numériques d'exercices d'application dans les
+formules clés.     
