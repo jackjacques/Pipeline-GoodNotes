@@ -55,7 +55,7 @@ class GeminiOCRProcessor:
             image_paths.append(img_path)
         return image_paths
 
-    def transcribe_page_image(self, image_path: str, page_number: int) -> str:
+    def transcribe_page_image(self, image_path: str, page_number: int, global_notes: str = "", specific_notes: str = "") -> str:
         """Uses Gemini Vision to perform handwriting recognition and LaTeX formatting for a page image."""
         if not self.api_key:
             return f"### Page {page_number}\n\n[Mode Mock] Transcription automatique désactivée (clé API Gemini manquante)."
@@ -66,8 +66,16 @@ class GeminiOCRProcessor:
             "1. Retranscris fidèlement l'ensemble des textes, titres, sous-titres, et listes à puces.\n"
             "2. Convertis TOUTES les formules et expressions mathématiques/physiques/chimiques au format LaTeX standard ($...$ pour inline, $$...$$ pour les blocs).\n"
             "3. Si la page comporte des schémas ou graphiques, ajoute un court extrait explicatif [Schéma Page manuscrite].\n"
-            "4. Ne résume pas le contenu à cette étape : fais une transcription exhaustive et claire sans ommettre de détails."
+            "4. Dans ce cas, détaille la notion particulièrement."
+	    "5. Si sur une slide, s'il y a une astérix en vert, détaille particulièrement et explique le cours.\n"
+	    "6. Dans ce cas, il est souvent marqué à côté ce qui n'est pas clair et pas compris.\n"
         )
+
+	if global_notes:
+		prompt += f"\n--- DIRECTIVES GENERALES ---\n{global_notes}\n"
+	if specific_notes:
+		prompt += f"\n--- DIRECTIVES SPECIFIQUES POUR CE DOCUMENT ---\n{specific_notes}\n"
+
 
         models_to_try = ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"]
         max_retries = 3

@@ -1,0 +1,26 @@
+Si vous avez transféré le PDF sur le VPS (par ex. dans                     
+  tmp_pdf/mon_cours.pdf via scp, sftp ou téléchargé localement) :            
+                                                                             
+    python3 backend/main.py \                                                
+      --test-file "tmp_pdf/mon_cours.pdf" \                                  
+      --title "Chapitre 1 : Optique Géométrique" \                           
+      --subject "Physique"                                                   
+                                                                             
+  (Le script découpe le PDF en images, exécute Gemini OCR page par page,     
+  génère le résumé de la séance, envoie les images et métadonnées sur        
+  Supabase, et envoie l'e-mail de récapitulatif).  
+
+
+                                                                             
+  Si la note est déjà présente sur votre site / base Supabase et que vous    
+  voulez forcer Gemini à la ré-analyser à partir du PDF original Google Drive
+  :                                                                          
+                                                                             
+    python3 backend/reanalyze.py --note-id "<ID_SUPABASE_DE_LA_NOTE>"        
+                                                                             
+  │ Comment trouver le note-id ?                                             
+  │                                                                          
+  │ • Soit dans l'URL de votre site web quand vous ouvrez la note (ex: #note-
+  │ 2da163ef-9848-4fbd-bfe2-7f0e0008f164).                                   
+  │ • Soit dans votre table Supabase notes (colonne id).                     
+  ──────                                                                     
