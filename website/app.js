@@ -1258,7 +1258,14 @@ async function generateQuizForCurrentNote() {
             })
         });
 
-        const data = await response.json();
+        const rawText = await response.text();
+        let data;
+        try {
+            data = JSON.parse(rawText);
+        } catch (jsonErr) {
+            throw new Error(`Le serveur a retourné du HTML au lieu de JSON (Code ${response.status}). Vérifiez que goodnotes-server.service a bien été redémarré après git pull.`);
+        }
+
         if (response.ok && data.quiz && data.quiz.length > 0) {
             note.quiz = data.quiz;
             const idx = allNotes.findIndex(n => n.id === note.id);
