@@ -78,6 +78,80 @@ class PipelineHTTPHandler(SimpleHTTPRequestHandler):
                 self.send_header("Access-Control-Allow-Origin", "*")
                 self.end_headers()
                 self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
+        elif self.path == "/api/generate_quiz":
+            content_len = int(self.headers.get("Content-Length", 0))
+            post_body = self.rfile.read(content_len) if content_len > 0 else b"{}"
+            try:
+                data = json.loads(post_body.decode("utf-8"))
+            except Exception:
+                data = {}
+
+            note_id = data.get("note_id")
+            num_questions = int(data.get("num_questions", 15))
+            if num_questions not in [10, 15, 20]:
+                num_questions = 15
+
+            if not note_id:
+                self.send_response(400)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": "note_id is required"}).encode("utf-8"))
+                return
+
+            print(f"\n🎯 Web request: Generating {num_questions} quiz questions for note {note_id}...", flush=True)
+
+            try:
+                sys.path.insert(0, os.path.join(PROJECT_ROOT, "backend"))
+                from supabase_client import SupabaseHelper
+                from ocr_processor import GeminiOCRProcessor
+
+                sb = SupabaseHelper()
+                res = sb.client.table("notes").select("id, title, subject_name, full_transcription").eq("id", note_id).execute()
+                if not res.data:
+                    self.send_response(404)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"error": "Note not found"}).encode("utf-8"))
+                    return
+
+                note = res.data[0]
+                transcription = note.get("full_transcription", "")
+                title = note.get("title", "Cours")
+                subject = note.get("subject_name", "Général")
+
+                if not transcription or len(transcription.strip()) < 20:
+                    self.send_response(400)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"error": "Retranscription insuffisante pour générer un quiz"}).encode("utf-8"))
+                    return
+
+                ocr = GeminiOCRProcessor()
+                quiz = ocr.generate_course_quiz(transcription, title, subject, num_questions=num_questions)
+
+                if quiz:
+                    sb.save_quiz(note_id, quiz)
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "ok", "quiz": quiz, "count": len(quiz)}).encode("utf-8"))
+                else:
+                    self.send_response(500)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"error": "Échec de génération du quiz par l'IA"}).encode("utf-8"))
+            except Exception as e:
+                print(f"❌ Error generating quiz: {e}", flush=True)
+                self.send_response(500)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
         else:
             self.send_error(404, "Endpoint not found")
 

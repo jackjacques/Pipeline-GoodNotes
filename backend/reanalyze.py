@@ -47,23 +47,44 @@ def reanalyze_note_by_id(note_id: str) -> bool:
                 subject_name=subject_name
             )
 
-            # Update Supabase note record
-            supabase.client.table("notes").update({
-                "full_transcription": full_transcription,
-                "summary": summary
-            }).eq("id", note_id).execute()
-
-            # Update pages
+            # Upload images to Supabase storage
             for page in pages_data:
-                page_num = page["page_number"]
-                transcription = page["transcription"]
-                supabase.client.table("note_pages").upsert({
-                    "note_id": note_id,
-                    "page_number": page_num,
-                    "transcription": transcription
-                }).execute()
+                img_path = page["image_path"]
+                storage_dest = f"notes/{gdrive_file_id}/page_{page['page_number']}.png"
+                public_url = supabase.upload_storage_file(img_path, storage_dest)
+                page["image_url"] = public_url
 
-            log_msg(f"✅ AI Re-Analysis successfully completed for '{title}'!")
+            # Generate course quiz (15 questions)
+            log_msg(f"🎯 Generating AI Course Quiz for '{title}' (15 questions)...")
+            quiz = ocr.generate_course_quiz(full_transcription, title, subject_name, num_questions=15)
+
+            # Update Supabase note record
+            update_data = {
+                "full_transcription": full_transcription,
+                "summary": summary,
+                "page_count": len(pages_data),
+                "quiz": quiz
+            }
+            try:
+                supabase.client.table("notes").update(update_data).eq("id", note_id).execute()
+            except Exception as e_quiz:
+                if "notes.quiz" in str(e_quiz):
+                    del update_data["quiz"]
+                    supabase.client.table("notes").update(update_data).eq("id", note_id).execute()
+                else:
+                    raise e_quiz
+
+            # Clean and re-insert pages
+            supabase.client.table("note_pages").delete().eq("note_id", note_id).execute()
+            for page in pages_data:
+                supabase.save_note_page(
+                    note_id=note_id,
+                    page_number=page["page_number"],
+                    transcription=page["transcription"],
+                    image_url=page.get("image_url")
+                )
+
+            log_msg(f"✅ AI Re-Analysis successfully completed for '{title}' ({len(pages_data)} pages)!")
             return True
         else:
             log_msg(f"❌ Failed to download file from Google Drive (ID: {gdrive_file_id})")
@@ -75,13 +96,13 @@ def reanalyze_note_by_id(note_id: str) -> bool:
         if os.path.exists(temp_pdf_path):
             os.remove(temp_pdf_path)
 
-def reanalyze_all_notes() -> bool:
-    """Force re-analysis of all PDF notes in Google Drive."""
+def reanalyze_all_notes(subject_filter: Optional[str] = None) -> bool:
+    """Force re-analysis of PDF notes in Google Drive, optionally filtered by subject/folder name."""
     supabase = SupabaseHelper()
     ocr = GeminiOCRProcessor()
     gdrive = GoogleDriveSync()
 
-    log_msg("⚡ Launching AI Re-Analysis for ALL documents in Google Drive...")
+    log_msg(f"⚡ Launching AI Re-Analysis (filter: {subject_filter or 'ALL'})...")
     pdf_files = gdrive.list_pdf_files()
 
     if not pdf_files:
@@ -97,10 +118,16 @@ def reanalyze_all_notes() -> bool:
             school_name = pdf_info.get("school", "Général")
             year_name = pdf_info.get("year", "Général")
 
+            if subject_filter:
+                filter_lower = subject_filter.lower()
+                subj_match = filter_lower in subject_name.lower() or filter_lower in title.lower()
+                if not subj_match:
+                    continue
+
             with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
                 temp_pdf_path = tmp.name
 
-            log_msg(f"📥 Downloading & Re-analyzing '{title}'...")
+            log_msg(f"📥 Downloading & Re-analyzing '{title}' ({subject_name})...")
             if gdrive.download_file(file_id, temp_pdf_path):
                 pages_data, full_transcription, summary, image_paths = ocr.process_pdf(
                     pdf_path=temp_pdf_path,
@@ -108,7 +135,14 @@ def reanalyze_all_notes() -> bool:
                     subject_name=subject_name
                 )
 
-                supabase.save_note(
+                # Upload page images
+                for page in pages_data:
+                    img_path = page["image_path"]
+                    storage_dest = f"notes/{file_id}/page_{page['page_number']}.png"
+                    public_url = supabase.upload_storage_file(img_path, storage_dest)
+                    page["image_url"] = public_url
+
+                saved_note = supabase.save_note(
                     title=title,
                     gdrive_file_id=file_id,
                     subject_name=subject_name,
@@ -118,6 +152,17 @@ def reanalyze_all_notes() -> bool:
                     full_transcription=full_transcription,
                     page_count=len(pages_data)
                 )
+
+                note_id = saved_note.get("id") if saved_note else None
+                if note_id:
+                    supabase.client.table("note_pages").delete().eq("note_id", note_id).execute()
+                    for page in pages_data:
+                        supabase.save_note_page(
+                            note_id=note_id,
+                            page_number=page["page_number"],
+                            transcription=page["transcription"],
+                            image_url=page.get("image_url")
+                        )
 
                 count += 1
                 if os.path.exists(temp_pdf_path):
@@ -132,13 +177,16 @@ def reanalyze_all_notes() -> bool:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Force AI Re-Analysis of original GoodNotes PDFs")
     parser.add_argument("--note-id", type=str, help="ID of specific note in Supabase to re-analyze")
+    parser.add_argument("--subject", type=str, help="Filter by subject / folder name (e.g. 'Advanced Imaging')")
     parser.add_argument("--all", action="store_true", help="Re-analyze all PDF notes in Google Drive")
 
     args = parser.parse_args()
 
     if args.note_id:
         reanalyze_note_by_id(args.note_id)
+    elif args.subject:
+        reanalyze_all_notes(subject_filter=args.subject)
     elif args.all:
         reanalyze_all_notes()
     else:
-        print("Please specify --note-id <ID> or --all")
+        print("Please specify --note-id <ID>, --subject <NAME>, or --all")

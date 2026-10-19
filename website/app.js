@@ -675,18 +675,11 @@ function openCourseModal(note) {
     // Render Tab 3: Formulaire du cours
     renderFormulasTab(note);
 
-    // Render Tab 4: QCM Quiz ONLY for 3A (VAP) and Master BME notes!
-    const meta = parseNoteMeta(note);
+    // Render Tab 4: QCM Quiz (Available for all notes)
     const quizBtn = document.getElementById("tab-btn-quiz");
-    const isEligibleForQuiz = (meta.year === "3A" || meta.school === "Master BME" || meta.year.includes("Master") || meta.year.includes("3A"));
-
     if (quizBtn) {
-        if (isEligibleForQuiz) {
-            quizBtn.classList.remove("hidden");
-            renderQuizTab(note);
-        } else {
-            quizBtn.classList.add("hidden");
-        }
+        quizBtn.classList.remove("hidden");
+        renderQuizTab(note);
     }
 
     // Render LaTeX Math with KaTeX
@@ -1077,100 +1070,87 @@ function renderFormulasTab(note) {
     renderKaTeX(container);
 }
 
-const SAMPLE_QUIZZES = {
-    bme: [
-        {
-            question: "1. Quel modèle est principalement utilisé pour analyser l'élasticité 3D des tissus biologiques ?",
-            options: [
-                "Loi de Hooke isotrope / anisotrope",
-                "Modèle de Navier-Stokes pour fluides",
-                "Équation de Maxwell-Boltzmann",
-                "Théorème de Nyquist"
-            ],
-            correct: 0,
-            explanation: "La loi de Hooke 3D relie le tenseur des contraintes au tenseur des déformations pour les tissus osseux et musculaires."
-        },
-        {
-            question: "2. Quelle modalité d'imagerie médicale est non-ionisante et basée sur le spin des protons d'hydrogène ?",
-            options: [
-                "Scanner X (CT-Scan)",
-                "IRM (Imagerie par Résonance Magnétique)",
-                "Scintigraphie osseuse",
-                "Radiographie conventionnelle"
-            ],
-            correct: 1,
-            explanation: "L'IRM utilise un champ magnétique intense et des ondes RF pour exciter les spins des noyaux d'hydrogène sans radiation ionisante."
-        },
-        {
-            question: "3. Quelle est l'unité principale de mesure du module d'Young en biomécanique osseuse ?",
-            options: [
-                "Pascal (Pa) ou GigaPascal (GPa)",
-                "Joules (J)",
-                "Watts (W)",
-                "Hertz (Hz)"
-            ],
-            correct: 0,
-            explanation: "Le module d'Young exprime la rigidité d'un matériau et se mesure en Pa ou GPa (l'os cortical a un module d'environ 15-20 GPa)."
-        }
-    ],
-    vap3a: [
-        {
-            question: "1. Dans les réseaux avancés de 3A VAP, quel protocole garantit la qualité de service (QoS) en réservant la bande passante ?",
-            options: [
-                "RSVP (Resource Reservation Protocol)",
-                "UDP (User Datagram Protocol)",
-                "ICMP Echo Request",
-                "ARP (Address Resolution Protocol)"
-            ],
-            correct: 0,
-            explanation: "RSVP permet d'établir des réservations de ressources à travers un réseau pour prendre en charge des flux multimédias exigeants."
-        },
-        {
-            question: "2. Quel est l'objectif principal d'un algorithme de consensus Proof of Stake (PoS) ?",
-            options: [
-                "Valider des blocs selon la quantité de jetons séquestrés au lieu de la puissance de calcul",
-                "Accroître la consommation d'électricité des serveurs",
-                "Remplacer les adresses IP v6 par du NAT 444",
-                "Crypter les paquets HTTP en SSL v2"
-            ],
-            correct: 0,
-            explanation: "Le PoS sélectionne les valideurs en fonction de leur participation financière (stake), économisant ainsi l'énergie par rapport au PoW."
-        },
-        {
-            question: "3. Quelle formule régit le calcul du débit maximal sans erreur sur un canal bruité ?",
-            options: [
-                "Capacité de Shannon C = B * log2(1 + SNR)",
-                "Formule de Taylor-Young",
-                "Équation de Schrödinger",
-                "Loi d'Ohm R = U / I"
-            ],
-            correct: 0,
-            explanation: "La capacité de Shannon définit la limite théorique maximale de débit binaire pour un canal avec une largeur de bande B et un rapport signal/bruit SNR."
-        }
-    ]
-};
+let selectedQuizCount = 15;
 
 function renderQuizTab(note) {
     const container = document.getElementById("quiz-content");
     if (!container) return;
 
-    const meta = parseNoteMeta(note);
-    const quizList = meta.school === "Master BME" ? SAMPLE_QUIZZES.bme : SAMPLE_QUIZZES.vap3a;
+    const quizList = (note && Array.isArray(note.quiz)) ? note.quiz : [];
+
+    if (quizList.length === 0) {
+        // Empty state: invite user to generate quiz with question count selector (10, 15, 20)
+        container.innerHTML = `
+            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 32px 24px; text-align: center; max-width: 620px; margin: 20px auto; box-shadow: 0 4px 20px rgba(0,0,0,0.03);">
+                <div style="width: 56px; height: 56px; margin: 0 auto 16px; border-radius: 14px; background: rgba(37, 99, 235, 0.1); color: #2563eb; display: flex; align-items: center; justify-content: center;">
+                    <i data-lucide="brain-circuit" style="width: 28px; height: 28px;"></i>
+                </div>
+                <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">
+                    Quiz IA d'Évaluation sur-mesure
+                </h3>
+                <p style="font-size: 0.92rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 24px;">
+                    L'IA Gemini va analyser la retranscription complète de <strong>"${escapeHTML(note.title)}"</strong> pour générer un QCM pédagogique spécifique avec formules LaTeX et explications détaillées.
+                </p>
+
+                <div style="margin-bottom: 24px;">
+                    <label style="display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-primary); margin-bottom: 10px;">
+                        Choisissez le format du quiz :
+                    </label>
+                    <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                        <button type="button" class="quiz-count-btn ${selectedQuizCount === 10 ? 'active' : ''}" onclick="selectQuizCount(10)" style="padding: 10px 16px; border-radius: 8px; border: 1px solid ${selectedQuizCount === 10 ? '#2563eb' : 'var(--border-color)'}; background: ${selectedQuizCount === 10 ? 'rgba(37, 99, 235, 0.1)' : 'var(--bg-modal)'}; color: ${selectedQuizCount === 10 ? '#2563eb' : 'var(--text-primary)'}; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+                            ⚡ 10 Questions (Express)
+                        </button>
+                        <button type="button" class="quiz-count-btn ${selectedQuizCount === 15 ? 'active' : ''}" onclick="selectQuizCount(15)" style="padding: 10px 16px; border-radius: 8px; border: 1px solid ${selectedQuizCount === 15 ? '#2563eb' : 'var(--border-color)'}; background: ${selectedQuizCount === 15 ? 'rgba(37, 99, 235, 0.1)' : 'var(--bg-modal)'}; color: ${selectedQuizCount === 15 ? '#2563eb' : 'var(--text-primary)'}; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+                            🎯 15 Questions (Standard)
+                        </button>
+                        <button type="button" class="quiz-count-btn ${selectedQuizCount === 20 ? 'active' : ''}" onclick="selectQuizCount(20)" style="padding: 10px 16px; border-radius: 8px; border: 1px solid ${selectedQuizCount === 20 ? '#2563eb' : 'var(--border-color)'}; background: ${selectedQuizCount === 20 ? 'rgba(37, 99, 235, 0.1)' : 'var(--bg-modal)'}; color: ${selectedQuizCount === 20 ? '#2563eb' : 'var(--text-primary)'}; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+                            🏆 20 Questions (Examen)
+                        </button>
+                    </div>
+                </div>
+
+                <div id="quiz-gen-action-area">
+                    <button type="button" id="btn-generate-quiz" onclick="generateQuizForCurrentNote()" style="padding: 12px 28px; background: #2563eb; color: #fff; border: none; border-radius: 10px; font-weight: 600; font-size: 0.95rem; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3); transition: all 0.2s;">
+                        <i data-lucide="sparkles" style="width: 18px; height: 18px;"></i>
+                        <span>Générer le Quiz IA maintenant</span>
+                    </button>
+                </div>
+            </div>
+        `;
+        initLucideIcons();
+        return;
+    }
+
+    // Active Quiz Display
+    window.quizScores = { answered: 0, correct: 0, total: quizList.length };
 
     let html = `
-        <div style="background: var(--bg-modal); border-radius: 12px; padding: 20px; border: 1px solid var(--border-color);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
+        <div style="background: var(--bg-modal); border-radius: 12px; padding: 22px; border: 1px solid var(--border-color);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; border-bottom: 1px solid var(--border-color); padding-bottom: 16px; flex-wrap: wrap; gap: 14px;">
                 <div>
-                    <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-primary); margin: 0;">
-                        🎯 QCM d'Évaluation (Réservé 3A VAP & Master BME)
+                    <h3 style="font-size: 1.2rem; font-weight: 700; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 8px;">
+                        🎯 QCM d'Évaluation — ${escapeHTML(note.title)}
                     </h3>
                     <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
-                        Vérification des notions clés pour la séance "${escapeHTML(note.title)}"
+                        Quiz personnalisé de ${quizList.length} questions généré par IA
                     </p>
                 </div>
-                <div id="quiz-score-badge" style="background: #2563eb; color: #fff; padding: 6px 14px; border-radius: 20px; font-weight: 600; font-size: 0.85rem;">
-                    Score : 0 / ${quizList.length}
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div id="quiz-score-badge" style="background: #2563eb; color: #fff; padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 0.9rem; box-shadow: 0 2px 8px rgba(37,99,235,0.25);">
+                        Score : 0 / ${quizList.length}
+                    </div>
+                    <button type="button" onclick="resetCurrentQuiz()" title="Réinitialiser les réponses" style="padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary); font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                        <i data-lucide="rotate-ccw" style="width: 14px; height: 14px;"></i> Recommencer
+                    </button>
+                    <button type="button" onclick="showQuizGeneratorPrompt()" title="Générer un autre quiz" style="padding: 6px 12px; border-radius: 8px; border: 1px solid rgba(37,99,235,0.3); background: rgba(37,99,235,0.08); color: #2563eb; font-size: 0.85rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                        <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> Nouveau Quiz
+                    </button>
                 </div>
+            </div>
+
+            <div id="quiz-completion-banner" class="hidden" style="margin-bottom: 22px; padding: 18px 22px; border-radius: 12px; background: rgba(34, 197, 94, 0.12); border: 1px solid rgba(34, 197, 94, 0.3); color: #15803d; text-align: center;">
+                <h4 id="quiz-completion-title" style="font-size: 1.15rem; font-weight: 700; margin: 0 0 6px 0;">Félicitations ! 🎉</h4>
+                <p id="quiz-completion-msg" style="margin: 0; font-size: 0.92rem;"></p>
             </div>
 
             <div style="display: flex; flex-direction: column; gap: 20px;">
@@ -1178,28 +1158,33 @@ function renderQuizTab(note) {
 
     quizList.forEach((q, qIdx) => {
         html += `
-            <div class="quiz-question-card" data-q-idx="${qIdx}" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 18px;">
-                <h4 style="font-size: 0.98rem; font-weight: 600; color: var(--text-primary); margin-bottom: 14px;">
-                    ${escapeHTML(q.question)}
-                </h4>
-                <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div class="quiz-question-card" data-q-idx="${qIdx}" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; padding: 20px; transition: all 0.2s;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px;">
+                    <h4 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin: 0; line-height: 1.5;">
+                        <span style="display: inline-block; width: 26px; height: 26px; border-radius: 50%; background: rgba(37,99,235,0.12); color: #2563eb; text-align: center; line-height: 26px; font-size: 0.82rem; font-weight: 700; margin-right: 8px;">${qIdx + 1}</span>
+                        ${escapeHTML(q.question)}
+                    </h4>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 9px;">
         `;
 
-        q.options.forEach((opt, optIdx) => {
+        const options = Array.isArray(q.options) ? q.options : [];
+        options.forEach((opt, optIdx) => {
             const isCorrect = optIdx === q.correct;
-            const escapedExp = escapeHTML(q.explanation).replace(/'/g, "\\'");
+            const escapedExp = escapeHTML(q.explanation || "").replace(/'/g, "\\'");
             html += `
                 <button type="button" class="quiz-option-btn" 
                         onclick="handleQuizOptionClick(this, ${qIdx}, ${isCorrect}, '${escapedExp}', ${quizList.length})"
-                        style="text-align: left; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-modal); color: var(--text-primary); font-size: 0.9rem; cursor: pointer; transition: all 0.2s ease;">
-                    ${escapeHTML(opt)}
+                        style="text-align: left; padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-modal); color: var(--text-primary); font-size: 0.92rem; cursor: pointer; transition: all 0.15s ease;">
+                    <span style="font-weight: 600; color: var(--text-muted); margin-right: 8px;">${String.fromCharCode(65 + optIdx)}.</span>
+                    <span>${escapeHTML(opt)}</span>
                 </button>
             `;
         });
 
         html += `
                 </div>
-                <div class="quiz-feedback hidden" style="margin-top: 14px; padding: 12px; border-radius: 8px; font-size: 0.88rem; line-height: 1.4;"></div>
+                <div class="quiz-feedback hidden" style="margin-top: 14px; padding: 14px 16px; border-radius: 8px; font-size: 0.9rem; line-height: 1.45;"></div>
             </div>
         `;
     });
@@ -1210,7 +1195,91 @@ function renderQuizTab(note) {
     `;
 
     container.innerHTML = html;
-    window.quizScores = { answered: 0, correct: 0 };
+    initLucideIcons();
+    renderKaTeX(container);
+}
+
+function selectQuizCount(count) {
+    selectedQuizCount = count;
+    document.querySelectorAll(".quiz-count-btn").forEach(btn => {
+        const isActive = btn.textContent.includes(String(count));
+        btn.classList.toggle("active", isActive);
+        btn.style.borderColor = isActive ? "#2563eb" : "var(--border-color)";
+        btn.style.background = isActive ? "rgba(37, 99, 235, 0.1)" : "var(--bg-modal)";
+        btn.style.color = isActive ? "#2563eb" : "var(--text-primary)";
+    });
+}
+
+function showQuizGeneratorPrompt() {
+    if (!activeModalNoteId) return;
+    const note = allNotes.find(n => n.id === activeModalNoteId);
+    if (!note) return;
+    const oldQuiz = note.quiz;
+    note.quiz = null;
+    renderQuizTab(note);
+    note.quiz = oldQuiz;
+}
+
+function resetCurrentQuiz() {
+    if (!activeModalNoteId) return;
+    const note = allNotes.find(n => n.id === activeModalNoteId);
+    if (note) {
+        renderQuizTab(note);
+    }
+}
+
+async function generateQuizForCurrentNote() {
+    if (!activeModalNoteId) return;
+    const note = allNotes.find(n => n.id === activeModalNoteId);
+    if (!note) return;
+
+    const actionArea = document.getElementById("quiz-gen-action-area");
+    if (actionArea) {
+        actionArea.innerHTML = `
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px 0;">
+                <div class="spinner" style="width: 28px; height: 28px; border: 3px solid rgba(37,99,235,0.2); border-top-color: #2563eb; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                <span style="font-size: 0.92rem; font-weight: 600; color: #2563eb;">
+                    Génération de ${selectedQuizCount} questions par Gemini 3.8 Flash...
+                </span>
+                <span style="font-size: 0.8rem; color: var(--text-muted);">
+                    Analyse des concepts clés, calculs et formules du cours.
+                </span>
+            </div>
+        `;
+    }
+
+    try {
+        const response = await fetch("/api/generate_quiz", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                note_id: note.id,
+                num_questions: selectedQuizCount
+            })
+        });
+
+        const data = await response.json();
+        if (response.ok && data.quiz && data.quiz.length > 0) {
+            note.quiz = data.quiz;
+            const idx = allNotes.findIndex(n => n.id === note.id);
+            if (idx !== -1) allNotes[idx].quiz = data.quiz;
+            renderQuizTab(note);
+        } else {
+            throw new Error(data.error || "Impossible de générer le quiz");
+        }
+    } catch (err) {
+        console.error("Quiz generation error:", err);
+        if (actionArea) {
+            actionArea.innerHTML = `
+                <div style="color: #ef4444; font-size: 0.9rem; margin-bottom: 12px;">
+                    ❌ Erreur lors de la génération : ${escapeHTML(err.message)}
+                </div>
+                <button type="button" onclick="generateQuizForCurrentNote()" style="padding: 10px 22px; background: #2563eb; color: #fff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
+                    Réessayer
+                </button>
+            `;
+        }
+    }
 }
 
 function handleQuizOptionClick(btn, qIdx, isCorrect, explanation, totalQuestions) {
@@ -1227,7 +1296,7 @@ function handleQuizOptionClick(btn, qIdx, isCorrect, explanation, totalQuestions
         b.style.opacity = "0.7";
     });
 
-    if (!window.quizScores) window.quizScores = { answered: 0, correct: 0 };
+    if (!window.quizScores) window.quizScores = { answered: 0, correct: 0, total: totalQuestions };
     window.quizScores.answered++;
 
     if (isCorrect) {
@@ -1244,6 +1313,7 @@ function handleQuizOptionClick(btn, qIdx, isCorrect, explanation, totalQuestions
             feedbackEl.style.border = "1px solid rgba(34, 197, 94, 0.3)";
             feedbackEl.style.color = "#15803d";
             feedbackEl.innerHTML = `<strong>Correct !</strong> ${explanation}`;
+            renderKaTeX(feedbackEl);
         }
     } else {
         btn.style.background = "#fee2e2";
@@ -1258,12 +1328,43 @@ function handleQuizOptionClick(btn, qIdx, isCorrect, explanation, totalQuestions
             feedbackEl.style.border = "1px solid rgba(239, 68, 68, 0.3)";
             feedbackEl.style.color = "#b91c1c";
             feedbackEl.innerHTML = `<strong>Incorrect.</strong> ${explanation}`;
+            renderKaTeX(feedbackEl);
         }
     }
 
     const badge = document.getElementById("quiz-score-badge");
     if (badge) {
         badge.textContent = `Score : ${window.quizScores.correct} / ${totalQuestions}`;
+    }
+
+    // Check if quiz completed
+    if (window.quizScores.answered >= totalQuestions) {
+        const banner = document.getElementById("quiz-completion-banner");
+        const titleEl = document.getElementById("quiz-completion-title");
+        const msgEl = document.getElementById("quiz-completion-msg");
+        if (banner && titleEl && msgEl) {
+            const pct = Math.round((window.quizScores.correct / totalQuestions) * 100);
+            banner.classList.remove("hidden");
+            if (pct >= 80) {
+                banner.style.background = "rgba(34, 197, 94, 0.12)";
+                banner.style.borderColor = "rgba(34, 197, 94, 0.3)";
+                banner.style.color = "#15803d";
+                titleEl.textContent = `Excellent travail ! 🎉 (${pct}%)`;
+                msgEl.textContent = `Vous avez obtenu ${window.quizScores.correct} bonnes réponses sur ${totalQuestions}. Les notions clés de ce cours sont très bien assimilées !`;
+            } else if (pct >= 50) {
+                banner.style.background = "rgba(234, 179, 8, 0.12)";
+                banner.style.borderColor = "rgba(234, 179, 8, 0.3)";
+                banner.style.color = "#854d0e";
+                titleEl.textContent = `Bon résultat ! 👍 (${pct}%)`;
+                msgEl.textContent = `Vous avez obtenu ${window.quizScores.correct} / ${totalQuestions}. Relisez les explications des questions manquées pour consolider vos acquis.`;
+            } else {
+                banner.style.background = "rgba(239, 68, 68, 0.12)";
+                banner.style.borderColor = "rgba(239, 68, 68, 0.3)";
+                banner.style.color = "#b91c1c";
+                titleEl.textContent = `À revoir 📖 (${pct}%)`;
+                msgEl.textContent = `Vous avez obtenu ${window.quizScores.correct} / ${totalQuestions}. N'hésitez pas à relire la retranscription et le formulaire avant de retenter le quiz !`;
+            }
+        }
     }
 }
 
@@ -1272,6 +1373,10 @@ window.changeSubject = changeSubject;
 window.openMoveModal = openMoveModal;
 window.closeMoveModal = closeMoveModal;
 window.handleQuizOptionClick = handleQuizOptionClick;
+window.selectQuizCount = selectQuizCount;
+window.generateQuizForCurrentNote = generateQuizForCurrentNote;
+window.resetCurrentQuiz = resetCurrentQuiz;
+window.showQuizGeneratorPrompt = showQuizGeneratorPrompt;
 
 function openCorrectionEditor() {
     if (!activeModalNoteId) return;

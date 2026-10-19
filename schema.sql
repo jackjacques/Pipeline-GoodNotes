@@ -21,11 +21,15 @@ CREATE TABLE IF NOT EXISTS notes (
     gdrive_file_id TEXT UNIQUE NOT NULL,
     summary TEXT,
     full_transcription TEXT,
+    quiz JSONB,
     pdf_url TEXT,
     page_count INT DEFAULT 0,
     processed_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
 );
+
+-- Migration for existing installations:
+-- ALTER TABLE notes ADD COLUMN IF NOT EXISTS quiz JSONB;
 
 -- Table: note_pages (Per page details, images and OCR transcripts)
 CREATE TABLE IF NOT EXISTS note_pages (

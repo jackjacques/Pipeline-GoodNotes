@@ -56,8 +56,12 @@ def process_single_pdf(
         page_urls.append(public_url)
         page["image_url"] = public_url
 
+    # 2b. Generate Course Quiz (15 questions)
+    print(f"  [AI Quiz] Generating dynamic course quiz for '{title}'...")
+    quiz = ocr.generate_course_quiz(full_transcription, title, subject_name, num_questions=15)
+
     # 3. Save Note metadata & transcription to Supabase Database
-    print("  [Supabase] Saving note & transcription record...")
+    print("  [Supabase] Saving note, transcription & quiz record...")
     saved_note = supabase.save_note(
         title=title,
         gdrive_file_id=gdrive_file_id,
@@ -66,6 +70,7 @@ def process_single_pdf(
         year_name=year_name,
         summary=summary,
         full_transcription=full_transcription,
+        quiz=quiz,
         page_count=len(pages_data)
     )
 

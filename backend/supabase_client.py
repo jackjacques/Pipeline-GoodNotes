@@ -41,6 +41,7 @@ class SupabaseHelper:
         year_name: Optional[str] = None,
         summary: Optional[str] = None,
         full_transcription: Optional[str] = None,
+        quiz: Optional[List[Dict[str, Any]]] = None,
         pdf_url: Optional[str] = None,
         page_count: int = 0
     ) -> Optional[Dict[str, Any]]:
@@ -94,18 +95,50 @@ class SupabaseHelper:
             "pdf_url": pdf_url or "",
             "page_count": page_count
         }
+        if quiz is not None:
+            data["quiz"] = quiz
 
         try:
             existing = self.client.table("notes").select("id").eq("gdrive_file_id", gdrive_file_id).execute()
             if existing.data:
                 note_id = existing.data[0]["id"]
-                res = self.client.table("notes").update(data).eq("id", note_id).execute()
+                try:
+                    res = self.client.table("notes").update(data).eq("id", note_id).execute()
+                except Exception as e_quiz:
+                    if "notes.quiz" in str(e_quiz) and "quiz" in data:
+                        print("  [Supabase Warning] Column notes.quiz does not exist yet. Please run: ALTER TABLE notes ADD COLUMN IF NOT EXISTS quiz JSONB;")
+                        del data["quiz"]
+                        res = self.client.table("notes").update(data).eq("id", note_id).execute()
+                    else:
+                        raise e_quiz
             else:
-                res = self.client.table("notes").insert(data).execute()
+                try:
+                    res = self.client.table("notes").insert(data).execute()
+                except Exception as e_quiz:
+                    if "notes.quiz" in str(e_quiz) and "quiz" in data:
+                        print("  [Supabase Warning] Column notes.quiz does not exist yet. Please run: ALTER TABLE notes ADD COLUMN IF NOT EXISTS quiz JSONB;")
+                        del data["quiz"]
+                        res = self.client.table("notes").insert(data).execute()
+                    else:
+                        raise e_quiz
             return res.data[0] if res.data else None
         except Exception as e:
             print(f"[Supabase Error] Failed to save note record ({e})")
             return None
+
+    def save_quiz(self, note_id: str, quiz_data: List[Dict[str, Any]]) -> bool:
+        """Saves or updates quiz JSON directly for a given note_id."""
+        if not self.client:
+            return False
+        try:
+            res = self.client.table("notes").update({"quiz": quiz_data}).eq("id", note_id).execute()
+            return bool(res.data)
+        except Exception as e:
+            if "notes.quiz" in str(e):
+                print("  [Supabase Warning] Column notes.quiz does not exist yet in database. Please run: ALTER TABLE notes ADD COLUMN IF NOT EXISTS quiz JSONB;")
+            else:
+                print(f"  [Supabase Error] Failed to save quiz for note {note_id}: {e}")
+            return False
 
     def save_note_page(self, note_id: str, page_number: int, transcription: str, image_url: Optional[str] = None):
         if not self.client:
